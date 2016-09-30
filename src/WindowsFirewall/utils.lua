@@ -1,6 +1,4 @@
 local bit32  = require "bit32"
-local luacom = require "luacom" luacom.StartLog([[f:\e\Projects\lua-WindowsFirewall\tt.log]])
-local uuid   = require "uuid"
 local luacom = require "luacom"
 
 local function class(base)
