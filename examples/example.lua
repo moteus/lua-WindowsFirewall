@@ -1,9 +1,7 @@
-# lua-WindowsFirewall
-Windows Firewall configuration library
+package.path = package.path .. ';..\\src\\?.lua'
 
+local WindowsFirewall = require "WindowsFirewall"
 
-### Usage
-```Lua
 local policy = WindowsFirewall.Policy()
 
 local profiles = policy:CurrentProfileTypes()
@@ -27,4 +25,3 @@ local rule = policy:AddRule{
   Enabled    = true;
   Profiles   = { Private = true };
 }
-```
