@@ -384,6 +384,10 @@ local function RemoveCleanup(self)
 end
 
 function FirewallPolicy:RemoveRule(rule)
+  -- Windows support remove rule only by name.
+  -- So if we want remove specific rule we need find it
+  -- then change name to some unique and then remove it.
+
   local rules, err = self:Rules()
   if not rules then return nil, err end
 
@@ -393,12 +397,18 @@ function FirewallPolicy:RemoveRule(rule)
   if type(rule) == 'string' then
     ok, err = pcommeth(rules, 'Remove', rule)
   elseif luacom.GetType(rule) then
-    local RemoveID =  rule.Name .. ' Remove(' .. REMOVE_MARK .. ')'
-    rule.Name = RemoveID
+    local RemoveID = rule.Name
+    if not string.find(RemoveID, REMOVE_MARK, nil, true) then
+      RemoveID =  RemoveID .. ' Remove(' .. REMOVE_MARK .. ')'
+      rule.Name = RemoveID
+    end
     ok, err = pcommeth(rules, 'Remove', RemoveID)
   elseif getmetatable(rule) == FirewallRule then
-    local RemoveID =  rule:Name() .. ' Remove(' .. REMOVE_MARK .. ')'
-    rule:SetName(RemoveID)
+    local RemoveID = rule:Name()
+    if not string.find(RemoveID, REMOVE_MARK, nil, true) then
+      RemoveID =  RemoveID .. ' Remove(' .. REMOVE_MARK .. ')'
+      rule:SetName(RemoveID)
+    end
     ok, err = pcommeth(rules, 'Remove', RemoveID)
   else
     error('invalid rule type: ' .. type(rule))
