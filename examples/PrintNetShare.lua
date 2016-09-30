@@ -3,12 +3,10 @@ package.path = package.path .. ';..\\src\\?.lua'
 local utils = require "WindowsFirewall.utils"
 
 utils.EachNetShare(function(cnn, props)
-  local szMsg = "Enabling Firwall on connection:"           .. "\n" ..
-                "   Name       : " ..  props.Name           .. "\n" ..
-                "   Guid       : " ..  props.Guid           .. "\n" ..
-                "   DeviceName : " ..  props.DeviceName     .. "\n" ..
-                "   Status     : " ..  props.Status         .. "\n" ..
-                "   MediaType  : " ..  props.MediaType      .. "\n" ..
-                "***********************************************\n"
-  print(szMsg)
+  print("Name       : ", props.Name       )
+  print("Guid       : ", props.Guid       )
+  print("DeviceName : ", props.DeviceName )
+  print("Status     : ", props.Status     )
+  print("MediaType  : ", props.MediaType  )
+  print("***********************************************")
 end)
