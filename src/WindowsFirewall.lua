@@ -157,14 +157,174 @@ local function InterfaceTypesFromT(t)
   error('invalid rule `InterfaceType` type: ' .. type(t))
 end
 
-local FirewallRule, FirewallPolicy
+local FirewallRule, FirewallPolicy, ServiceRestriction
 
 -------------------------------------------------------------------------------
-FirewallPolicy = ut.class() do
+local Rules = ut.class() do
 
 local REMOVE_MARK = '8c088385-4ac7-494a-83fe-af2fecfe5452'
 
+local function RemoveCleanup(self)
+  -- I do not know either it safe remove item in cycle
+  -- so at first I select all rules and then remove them one by one.
+  local names = {} for rule in self:iRulesRaw() do
+    local name = rule.Name
+    if string.find(name, REMOVE_MARK) then
+      names[#names + 1] = name
+    end
+  end
+
+  for _, name in ipairs(names) do
+    self:RemoveRule(name)
+  end
+
+  return #names
+end
+
+function Rules:__init(rules)
+  self._rules = assert(rules)
+
+  return self
+end
+
+function Rules:handle()
+  return self._rules
+end
+
+function Rules:iRules()
+  local rules = assert(self:handle())
+  return enum(rules, FirewallRule.new)
+end
+
+function Rules:AddRule(rule)
+  local rules = assert(self:handle())
+
+  local ok, err
+  if luacom.GetType(rule) then
+    ok, err = pcommeth(rules, 'Add', rule)
+  elseif type(rule) == 'table' then 
+    if getmetatable(rule) ~= FirewallRule then
+      rule, err = FirewallRule.new(rule)
+      if not rule then return nil, err end
+    end
+    ok, err = pcommeth(rules, 'Add', rule._rule)
+  else
+    error('invalid rule type: ' .. type(rule))
+  end
+
+  if err then return nil, err end
+
+  return rule
+end
+
+function Rules:RemoveRule(rule)
+  -- Windows support remove rule only by name.
+  -- So if we want remove specific rule we need find it
+  -- then change name to some unique and then remove it.
+
+  local rules = assert(self:handle())
+
+  local ok, err
+  -- function does not retyrn anything if rule does not exists
+  -- Also it only remove `first` rule with this name
+  if type(rule) == 'string' then
+    ok, err = pcommeth(rules, 'Remove', rule)
+  elseif luacom.GetType(rule) then
+    local RemoveID = rule.Name
+    if not string.find(RemoveID, REMOVE_MARK, nil, true) then
+      RemoveID =  RemoveID .. ' Remove(' .. REMOVE_MARK .. ')'
+      rule.Name = RemoveID
+    end
+    ok, err = pcommeth(rules, 'Remove', RemoveID)
+  elseif getmetatable(rule) == FirewallRule then
+    local RemoveID = rule:Name()
+    if not string.find(RemoveID, REMOVE_MARK, nil, true) then
+      RemoveID =  RemoveID .. ' Remove(' .. REMOVE_MARK .. ')'
+      rule:SetName(RemoveID)
+    end
+    ok, err = pcommeth(rules, 'Remove', RemoveID)
+  else
+    error('invalid rule type: ' .. type(rule))
+  end
+
+  if err then return nil, err end
+
+  return self
+end
+
+function Rules:FindRule(filter)
+  local rules = assert(self:handle())
+
+  local ok, err
+
+  if type(filter) == 'string' then
+    ok, err = pcommeth(rules, 'Item', filter)
+  end
+
+  if err then return nil, err end
+
+  -- not found
+  if not ok then return end
+
+  return FirewallRule.new(ok)
+end
+
+end
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+local RulesEdit = ut.class() do
+
+function RulesEdit:Rules()
+  if not self._rules then
+    local rules, err = pcomget(self:handle(), 'Rules')
+    if not rules then return nil, err end
+    self._rules = Rules.new(rules)
+  end
+
+  return self._rules
+end
+
+function RulesEdit:iRules()
+  local rules = assert(self:Rules())
+  return rules:iRules()
+end
+
+function RulesEdit:iRulesRaw()
+  local rules = assert(self:Rules())
+  return rules:iRulesRaw()
+end
+
+function RulesEdit:AddRule(rule)
+  local rules, err = self:Rules()
+  if not rules then return nil, err end
+
+  return rules:AddRule(rule)
+end
+
+function RulesEdit:RemoveRule(rule)
+  local rules, err = self:Rules()
+  if not rules then return nil, err end
+
+  return rules:RemoveRule(rule)
+end
+
+function RulesEdit:FindRule(filter)
+  local rules, err = self:Rules()
+  if not rules then return nil, err end
+
+  return rules:FindRule(filter)
+end
+
+end
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+FirewallPolicy = ut.class(RulesEdit) do
+
 function FirewallPolicy:__init()
+  if self.__base.__init then self.__base.__init(self) end
+
   self._policy = policy or assert(luacom.CreateObject(FwPolicy2CLSID))
 
   return self
@@ -257,30 +417,10 @@ function FirewallPolicy:SetUnicastResponsesToMulticastBroadcastDisabled(profile,
   return self
 end
 
-function FirewallPolicy:Rules()
-  if not self._rules then
-    local rules, err = pcomget(self._policy, 'Rules')
-    if not rules then return nil, err end
-    self._rules = rules
-  end
-  return self._rules
-end
-
-function FirewallPolicy:iRules()
-  local rules = assert(self:Rules())
-  return enum(rules, FirewallRule.new)
-end
-
-function FirewallPolicy:iRulesRaw()
-  local rules = assert(self:Rules())
-  return enum(rules)
-end
-
 function FirewallPolicy:ServiceRestriction()
-  -- INetFwServiceRestriction
   local restriction, err = pcomget(self._policy, 'ServiceRestriction')
   if not restriction then return nil, err end
-  return restriction
+  return ServiceRestriction.new(restriction)
 end
 
 function FirewallPolicy:EnableRuleGroup(profile, group, value)
@@ -341,98 +481,6 @@ function FirewallPolicy:LocalPolicyModifyState()
   local ok, err = pcommeth(self._policy, 'LocalPolicyModifyState')
   if err then return nil, err end
   return self
-end
-
-function FirewallPolicy:AddRule(rule)
-  local rules, err = self:Rules()
-  if not rules then return nil, err end
-
-  local ok, err
-  if luacom.GetType(rule) then
-    ok, err = pcommeth(rules, 'Add', rule)
-  elseif type(rule) == 'table' then 
-    if getmetatable(rule) ~= FirewallRule then
-      rule, err = FirewallRule.new(rule)
-      if not rule then return nil, err end
-    end
-    ok, err = pcommeth(rules, 'Add', rule._rule)
-  else
-    error('invalid rule type: ' .. type(rule))
-  end
-
-  if err then return nil, err end
-
-  return rule
-end
-
-local function RemoveCleanup(self)
-  -- I do not know either it safe remove item in cycle
-  local names = {} for rule in self:iRulesRaw() do
-    local name = rule.Name
-    if string.find(name, REMOVE_MARK) then
-      names[#names + 1] = name
-    end
-  end
-
-  for _, name in ipairs(names) do
-    self:RemoveRule(name)
-  end
-
-  return #names
-end
-
-function FirewallPolicy:RemoveRule(rule)
-  -- Windows support remove rule only by name.
-  -- So if we want remove specific rule we need find it
-  -- then change name to some unique and then remove it.
-
-  local rules, err = self:Rules()
-  if not rules then return nil, err end
-
-  local ok, err
-  -- function does not retyrn anything if rule does not exists
-  -- Also it only remove `first` rule with this name
-  if type(rule) == 'string' then
-    ok, err = pcommeth(rules, 'Remove', rule)
-  elseif luacom.GetType(rule) then
-    local RemoveID = rule.Name
-    if not string.find(RemoveID, REMOVE_MARK, nil, true) then
-      RemoveID =  RemoveID .. ' Remove(' .. REMOVE_MARK .. ')'
-      rule.Name = RemoveID
-    end
-    ok, err = pcommeth(rules, 'Remove', RemoveID)
-  elseif getmetatable(rule) == FirewallRule then
-    local RemoveID = rule:Name()
-    if not string.find(RemoveID, REMOVE_MARK, nil, true) then
-      RemoveID =  RemoveID .. ' Remove(' .. REMOVE_MARK .. ')'
-      rule:SetName(RemoveID)
-    end
-    ok, err = pcommeth(rules, 'Remove', RemoveID)
-  else
-    error('invalid rule type: ' .. type(rule))
-  end
-
-  if err then return nil, err end
-
-  return self
-end
-
-function FirewallPolicy:FindRule(filter)
-  local rules, err = self:Rules()
-  if not rules then return nil, err end
-
-  local ok, err
-
-  if type(filter) == 'string' then
-    ok, err = pcommeth(rules, 'Item', filter)
-  end
-
-  if err then return nil, err end
-
-  -- not found
-  if not ok then return end
-
-  return FirewallRule.new(ok)
 end
 
 end
@@ -753,6 +801,38 @@ end
 
 end
 -------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+ServiceRestriction = ut.class(RulesEdit) do
+
+function ServiceRestriction:__init(handle)
+  if self.__base.__init then self.__base.__init(self) end
+
+  self._handle = assert(handle)
+
+  return self
+end
+
+function ServiceRestriction:handle()
+  return self._handle
+end
+
+function ServiceRestriction:RestrictService(serviceName, appName, restrict, serviceSidRestricted)
+  local ok, err = pcommeth(self:handle(), 'RestrictService', serviceName, appName, restrict, serviceSidRestricted)
+  if err then return nil, err end
+
+  return self
+end
+
+function ServiceRestriction:ServiceRestricted(serviceName, appName)
+  local ok, err = pcommeth(self:handle(), 'ServiceRestricted', serviceName, appName)
+  if err then return nil, err end
+
+  return ok
+end
+
+end
+-----------------------------------------------------------------------------------
 
 return {
   _NAME    = _NAME;
