@@ -268,13 +268,11 @@ end
 
 function FirewallPolicy:iRules()
   local rules = assert(self:Rules())
-  if not rules then return nil, err end
   return enum(rules, FirewallRule.new)
 end
 
 function FirewallPolicy:iRulesRaw()
   local rules = assert(self:Rules())
-  if not rules then return nil, err end
   return enum(rules)
 end
 
@@ -443,6 +441,15 @@ end
 -------------------------------------------------------------------------------
 FirewallRule = ut.class() do
 
+-- In my test `setEnabled(true)` does not works.
+-- Not sure why, but e.g. policy:setFirewallEnabled(true) works
+-- Also `getEnabled()` returns boolean type
+-- So for now I use convert bool to interger for Rules only.
+local function bool2int(...)
+  if type(...) == 'boolean' then return ... and 1 or 0 end
+  return ...
+end
+
 local function Set(self, r)
   if type(r) == 'string' then self:SetName(r) else
     self:SetName(r.Name)
@@ -551,7 +558,7 @@ function FirewallRule:EdgeTraversal()
 end
 
 function FirewallRule:SetEdgeTraversal(value)
-  local ok, err = pcomset(self._rule, 'EdgeTraversal', value)
+  local ok, err = pcomset(self._rule, 'EdgeTraversal', bool2int(value))
   if err then return nil, err end
   return self
 end
@@ -563,8 +570,7 @@ function FirewallRule:Enabled()
 end
 
 function FirewallRule:SetEnabled(value)
-  if type(value) == 'boolean' then value = value and 1 or 0 end
-  local ok, err = pcomset(self._rule, 'Enabled', value)
+  local ok, err = pcomset(self._rule, 'Enabled', bool2int(value))
   if err then return nil, err end
   return self
 end
