@@ -9,8 +9,10 @@ for profile, exists in pairs(profiles) do
   if exists then
     local enabled = policy:FirewallEnabled(profile)
     print(string.format("On %s profile (Current) : Firewall state is %s", profile, enabled and "ON" or "OFF"))
-    for rule in policy:iRules(profile) do
-      print(rule:Name(), rule:Direction())
+    for rule in policy:iRules() do
+      if rule:Profiles()[profile] then
+        print(rule:Name(), rule:Direction())
+      end
     end
   end
 end
