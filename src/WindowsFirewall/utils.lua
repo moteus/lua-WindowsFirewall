@@ -1,6 +1,33 @@
 local bit32  = require "bit32"
 local luacom = require "luacom"
 
+local function split(str, sep, plain)
+  local b, res = 1, {}
+  while b <= #str do
+    local e, e2 = string.find(str, sep, b, plain)
+    if e then
+      res[#res + 1] = string.sub(str, b, e-1)
+      b = e2 + 1
+    else
+      res[#res + 1] = string.sub(str, b)
+      break
+    end
+  end
+  return res
+end
+
+local unpack = unpack or table.unpack
+
+local function usplit(...) return unpack(split(...)) end
+
+local function split_first(str, sep, plain)
+  local e, e2 = string.find(str, sep, nil, plain)
+  if e then
+    return string.sub(str, 1, e - 1), string.sub(str, e2 + 1)
+  end
+  return str
+end
+
 local function class(base)
   local t = base and setmetatable({}, base) or {}
   t.__index = t
@@ -120,6 +147,7 @@ return {
   pcomset  = pcomset;
   pcomget  = pcomget;
   pcommeth = pcommeth;
+  split    = split;
 
   EachNetShare                    = EachNetShare;
   EachNetworkAdapter              = EachNetworkAdapter;

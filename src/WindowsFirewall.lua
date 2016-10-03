@@ -776,27 +776,43 @@ function FirewallRule:SetServiceName(value)
   return self
 end
 
-function FirewallRule:print()
-  local pp = require "pp"
+local function p(v, err)
+  if v == nil and err then return "ERROR: " .. err end
 
-  pp("Name:",            self:Name())
-  pp("Action:",          self:Action())
-  pp("ApplicationName:", self:ApplicationName())
-  pp("Description:",     self:Description())
-  pp("Direction:", self:Direction())
-  pp("EdgeTraversal:", self:EdgeTraversal())
-  pp("Enabled:", self:Enabled())
-  pp("Grouping:", self:Grouping())
-  pp("IcmpTypesAndCodes:", self:IcmpTypesAndCodes())
-  pp("Interfaces:", self:Interfaces())
-  pp("InterfaceTypes:", self:InterfaceTypes())
-  pp("LocalAddresses:", self:LocalAddresses())
-  pp("LocalPorts:", self:LocalPorts())
-  pp("Profiles:", self:Profiles())
-  pp("Protocol:", self:Protocol())
-  pp("RemoteAddresses:", self:RemoteAddresses())
-  pp("RemotePorts:", self:RemotePorts())
-  pp("ServiceName:", self:ServiceName())
+  if type(v) == 'table' then
+    if v[1] then return table.concat(v, ', ') end
+    local msg = ''
+    for k, v in pairs(v) do
+      if msg ~= '' then msg = msg .. ', ' end
+      msg = msg .. k
+    end
+    return msg
+  end
+
+  if err then v = tostring(v) .. "(" .. err .. ")" end
+  
+  return tostring(v)
+end
+
+function FirewallRule:print()
+  print("Name              : ", p(self:Name()              ))
+  print("ServiceName       : ", p(self:ServiceName()       ))
+  print("ApplicationName   : ", p(self:ApplicationName()   ))
+  print("Action            : ", p(self:Action()            ))
+  print("Description       : ", p(self:Description()       ))
+  print("Direction         : ", p(self:Direction()         ))
+  print("Protocol          : ", p(self:Protocol()          ))
+  print("LocalAddresses    : ", p(self:LocalAddresses()    ))
+  print("LocalPorts        : ", p(self:LocalPorts()        ))
+  print("RemoteAddresses   : ", p(self:RemoteAddresses()   ))
+  print("RemotePorts       : ", p(self:RemotePorts()       ))
+  print("EdgeTraversal     : ", p(self:EdgeTraversal()     ))
+  print("Grouping          : ", p(self:Grouping()          ))
+  print("IcmpTypesAndCodes : ", p(self:IcmpTypesAndCodes() ))
+  print("Interfaces        : ", p(self:Interfaces()        ))
+  print("InterfaceTypes    : ", p(self:InterfaceTypes()    ))
+  print("Profiles          : ", p(self:Profiles()          ))
+  print("Enabled           : ", p(self:Enabled()           ))
 end
 
 end
