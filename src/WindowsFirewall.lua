@@ -489,10 +489,9 @@ end
 -------------------------------------------------------------------------------
 FirewallRule = ut.class() do
 
--- In my test `setEnabled(true)` does not works.
--- Not sure why, but e.g. policy:setFirewallEnabled(true) works
--- Also `getEnabled()` returns boolean type
--- So for now I use convert bool to interger for Rules only.
+-- Problem in LuaCOM which pass incorrect boolean value
+-- INetFwRule can not work with such values but seems can work with
+-- interger values.
 local function bool2int(...)
   if type(...) == 'boolean' then return ... and 1 or 0 end
   return ...
@@ -783,8 +782,10 @@ local function p(v, err)
     if v[1] then return table.concat(v, ', ') end
     local msg = ''
     for k, v in pairs(v) do
-      if msg ~= '' then msg = msg .. ', ' end
-      msg = msg .. k
+      if v == true then
+        if msg ~= '' then msg = msg .. ', ' end
+        msg = msg .. k
+      end
     end
     return msg
   end
