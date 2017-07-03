@@ -27,3 +27,9 @@ local rule = policy:AddRule{
   Enabled    = true;
   Profiles   = { Private = true };
 }
+
+rule = policy:FindRule('Test_Rule')
+
+rule:print()
+
+policy:RemoveRule(rule)
